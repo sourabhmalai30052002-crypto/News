@@ -3,7 +3,7 @@ import glob
 import json
 import datetime
 import time
-import google.generativeai as genai
+from google import genai
 
 # Setup paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,12 +21,7 @@ SYSTEM_INSTRUCTION = """You are an expert AI Finance Agent. Perform a detailed a
 
 def main():
     # Initialize the client
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        print("Error: GEMINI_API_KEY environment variable not set.")
-        return
-        
-    genai.configure(api_key=api_key)
+    client = genai.Client() # Uses GEMINI_API_KEY from environment
 
     # Find the first PDF in raw_papers
     pdf_files = glob.glob(os.path.join(RAW_DIR, "*.pdf"))
@@ -39,26 +34,22 @@ def main():
     
     # Upload to Gemini File API
     print("Uploading file to Gemini...")
-    uploaded_file = genai.upload_file(path=pdf_path)
+    uploaded_file = client.files.upload(file=pdf_path)
     
     # Wait for the file to be processed
     print("Waiting for file processing...")
-    while uploaded_file.state.name == "PROCESSING":
-        print(".", end="", flush=True)
-        time.sleep(2)
-        uploaded_file = genai.get_file(uploaded_file.name)
-    
-    print("\nFile ready.")
+    time.sleep(10)
     
     try:
         # Generate content
         print("Generating digest...")
-        model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash',
-            system_instruction=SYSTEM_INSTRUCTION
+        response = client.models.generate_content(
+            model='gemini-2.0-flash',
+            contents=[uploaded_file, "Please analyze this daily newspaper."],
+            config=genai.types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION,
+            )
         )
-        
-        response = model.generate_content([uploaded_file, "Please analyze this daily newspaper."])
         
         # Save output
         date_str = datetime.datetime.now().strftime("%Y-%m-%d")
@@ -78,7 +69,7 @@ def main():
     finally:
         # Clean up
         print("Deleting file from Gemini...")
-        genai.delete_file(uploaded_file.name)
+        client.files.delete(name=uploaded_file.name)
         
         # Optional: Delete the local PDF to clear the folder for tomorrow
         os.remove(pdf_path)
