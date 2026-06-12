@@ -35,11 +35,16 @@ def main():
     print("Uploading file to Gemini...")
     uploaded_file = client.files.upload(file=pdf_path)
     
+    # Wait for the file to be processed
+    import time
+    print("Waiting for file processing...")
+    time.sleep(10)
+    
     try:
         # Generate content
         print("Generating digest...")
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.0-flash',
             contents=[uploaded_file, "Please analyze this daily newspaper."],
             config=genai.types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,
