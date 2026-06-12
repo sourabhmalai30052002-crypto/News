@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial News Portal - MBA Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --panel-bg: #0d0d0d;
+            --text-color: #ff9900; /* Bloomberg Amber */
+            --accent-color: #00ff00; /* Neon Green for positive/accents */
+            --border-color: #333333;
+            --font-family: 'Consolas', 'Courier New', monospace;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar for Navigation */
+        #sidebar {
+            width: 280px;
+            background-color: var(--panel-bg);
+            border-right: 2px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        #sidebar h2 {
+            font-size: 1.2rem;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        .nav-item {
+            cursor: pointer;
+            padding: 10px;
+            margin-bottom: 5px;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            border-color: var(--text-color);
+            background-color: rgba(255, 153, 0, 0.1);
+        }
+
+        /* Main Content Area */
+        #main-content {
+            flex-grow: 1;
+            padding: 40px;
+            overflow-y: auto;
+            background-color: var(--bg-color);
+            scroll-behavior: smooth;
+        }
+
+        #content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 15px;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            color: var(--accent-color);
+            margin: 0;
+            font-size: 2rem;
+            text-transform: uppercase;
+        }
+
+        .terminal-header {
+            font-size: 1rem;
+            opacity: 0.8;
+            font-weight: bold;
+        }
+
+        /* Markdown Styling */
+        .markdown-body {
+            line-height: 1.8;
+            max-width: 900px;
+            margin: 0 auto;
+            font-size: 1.1rem;
+        }
+
+        .markdown-body h2 {
+            color: var(--accent-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-top: 50px;
+            margin-bottom: 20px;
+            font-size: 1.6rem;
+        }
+
+        .markdown-body h3 {
+            color: #ffffff;
+            margin-top: 30px;
+            font-size: 1.3rem;
+        }
+
+        .markdown-body ul {
+            padding-left: 25px;
+            margin-bottom: 20px;
+        }
+
+        .markdown-body li {
+            margin-bottom: 12px;
+        }
+        
+        .markdown-body strong {
+            color: #ffffff;
+            font-weight: bold;
+        }
+
+        /* Loading state */
+        .loading {
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h2>Archives</h2>
+        <div id="nav-list">
+            <div class="loading">Loading records...</div>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <div id="content-header">
+            <h1 id="digest-title">Loading Digest...</h1>
+            <div class="terminal-header" id="current-time"></div>
+        </div>
+        
+        <div id="markdown-container" class="markdown-body">
+            <p class="loading">INITIALIZING SYSTEM... FETCHING DATA FROM MAINFRAME...</p>
+        </div>
+    </div>
+
+    <script>
+        // Update time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').innerText = "SYS TIME: " + now.toISOString().replace('T', ' ').substring(0, 19) + " UTC";
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Fetch manifest and load digests
+        async function init() {
+            try {
+                const response = await fetch('digests/manifest.json');
+                if (!response.ok) throw new Error("Manifest not found");
+                
+                const manifest = await response.json();
+                renderNav(manifest);
+                
+                if (manifest.length > 0) {
+                    loadDigest(manifest[0]);
+                } else {
+                    document.getElementById('markdown-container').innerHTML = "<p>No records found in database.</p>";
+                    document.getElementById('digest-title').innerText = "AWAITING INPUT";
+                }
+            } catch (error) {
+                console.error("Error loading manifest:", error);
+                document.getElementById('nav-list').innerHTML = "<p style='color:red'>ERR: CONNECTION FAILED</p>";
+                document.getElementById('markdown-container').innerHTML = "<p>Please ensure manifest.json exists and papers have been processed.</p>";
+            }
+        }
+
+        function renderNav(manifest) {
+            const navList = document.getElementById('nav-list');
+            navList.innerHTML = '';
+            
+            manifest.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'nav-item' + (index === 0 ? ' active' : '');
+                div.innerText = "DIGEST " + item.date;
+                div.onclick = () => {
+                    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                    div.classList.add('active');
+                    loadDigest(item);
+                };
+                navList.appendChild(div);
+            });
+        }
+
+        async function loadDigest(item) {
+            document.getElementById('markdown-container').innerHTML = '<p class="loading">FETCHING FILE: ' + item.file + '...</p>';
+            document.getElementById('digest-title').innerText = "DIGEST: " + item.date;
+            
+            try {
+                const response = await fetch('digests/' + item.file);
+                if (!response.ok) throw new Error("File not found");
+                
+                const text = await response.text();
+                document.getElementById('markdown-container').innerHTML = marked.parse(text);
+                
+                // Scroll to top
+                document.getElementById('main-content').scrollTop = 0;
+            } catch (error) {
+                console.error("Error loading digest:", error);
+                document.getElementById('markdown-container').innerHTML = "<p style='color:red'>ERR: FILE RETRIEVAL FAILED</p>";
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
