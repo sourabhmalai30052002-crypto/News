@@ -41,15 +41,33 @@ def main():
     time.sleep(10)
     
     try:
-        # Generate content
-        print("Generating digest...")
-        response = client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=[uploaded_file, "Please analyze this daily newspaper."],
-            config=genai.types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-            )
-        )
+        # Generate content with fallback models
+        models_to_try = [
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+            'gemini-1.5-flash-8b',
+            'gemini-1.5-pro',
+            'gemini-pro'
+        ]
+        
+        response = None
+        for model_name in models_to_try:
+            try:
+                print(f"Trying to generate digest with {model_name}...")
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[uploaded_file, "Please analyze this daily newspaper."],
+                    config=genai.types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                    )
+                )
+                print(f"Successfully generated digest using {model_name}!")
+                break
+            except Exception as e:
+                print(f"Failed with {model_name}. Reason: {e}")
+                
+        if not response:
+            raise Exception("CRITICAL ERROR: All Gemini models failed. This means your Google Account has a hard limit of 0. You MUST go to Google Cloud Console and set up a Billing Account to unlock the API in your region.")
         
         # Save output
         date_str = datetime.datetime.now().strftime("%Y-%m-%d")
